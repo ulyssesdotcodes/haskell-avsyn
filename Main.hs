@@ -44,8 +44,9 @@ removeClient client = filter ((/= fst client) . fst)
 broadcast :: ByteString -> ServerState -> IO ()
 broadcast message clients = forM_ clients $ \(_, conn) -> WS.sendTextData conn message
 
-broadcastBundle:: OSC.Bundle -> ServerState -> IO ()
-broadcastBundle bundle = broadcast $ bundleToJSON bundle
+broadcastMessages :: [OSC.Message] -> ServerState -> IO ()
+broadcastMessages [] __ = return ()
+broadcastMessages m state = (broadcast . bundleToJSON . messagesToBundle) m state
 
 bundleToJSON :: OSC.Bundle -> ByteString
 bundleToJSON = A.encode . A.toJSON
@@ -57,17 +58,18 @@ messagesFromMaybe :: Maybe [OSC.Message] -> [OSC.Message]
 messagesFromMaybe Nothing = []
 messagesFromMaybe (Just x) = x
 
-modifyMixer :: MVar Mixer -> OSC.Message -> IO ()
-modifyMixer state message = modifyMVar_ state $ \mixer -> do
-    let mixerState = applyMessage message mixer
-    sendUDPMessages (snd mixerState)
-    return $ fst mixerState
+modifyMixer :: MVar Mixer -> ServerState -> OSC.Message -> IO ()
+modifyMixer mixerState serverState message = do
+    messages <- modifyMVar mixerState (return . applyMessage message)
+    sendUDPMessages messages
+    broadcastMessages messages serverState
 
-receiveSocketMessages :: MVar Mixer -> WS.Connection -> IO ()
-receiveSocketMessages state conn = forever $ do
+receiveSocketMessages :: MVar Mixer -> WS.Connection -> MVar ServerState -> IO ()
+receiveSocketMessages state conn serverState = forever $ do
   (msg :: ByteString) <- WS.receiveData conn
+  clients <- readMVar serverState
   let messages = extractMessages msg
-  mapM_ (modifyMixer state) messages
+  mapM_ (modifyMixer state clients) messages
 
 bundleToMessages :: OSC.Bundle -> [OSC.Message]
 bundleToMessages = OSC.bundleMessages
@@ -78,14 +80,10 @@ messagesToBundle = OSC.bundle OSC.immediately
 -- OSC messaging
 sendUDPMessage :: OSC.Message -> IO ()
 sendUDPMessage  message = do
-  print message
-  hFlush stdout
   OSC.withTransport (OSC.openUDP "127.0.0.1" 3334) $ OSC.sendMessage message
 
 sendUDPMessages :: [ OSC.Message ] -> IO ()
 sendUDPMessages messages = do
-  print messages
-  hFlush stdout
   OSC.withTransport (OSC.openUDP "127.0.0.1" 3334) $ OSC.sendBundle (OSC.Bundle 0.0 messages)
 
 receiveMessageTransport :: IO OSC.UDP -> MessageQueue -> IO ()
@@ -139,7 +137,7 @@ application cinderState serverState pending = do
         return s'
     mixer <- readMVar cinderState
     (WS.sendTextData conn) . bundleToJSON . messagesToBundle $ mixerToMessages True mixer
-    receiveSocketMessages cinderState conn
+    receiveSocketMessages cinderState conn serverState
     where
         disconnect client = do
             s <- modifyMVar_ serverState $ \s ->
