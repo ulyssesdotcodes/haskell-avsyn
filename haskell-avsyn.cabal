@@ -17,15 +17,14 @@ cabal-version:       >=1.10
 
 executable haskell-avsyn
   main-is:             Main.hs
-  -- other-modules:       
+  other-modules:       AesonOSC, Cinder
   -- other-extensions:    
-  build-depends: aeson ==0.8.*
-               , base >=4.6 && <4.8, base-prelude
+  build-depends: aeson ==0.10.*
+               , base >=4.6, base-prelude
                , bytestring >= 0.10.4.0
                , file-embed >= 0.0.9
                , hosc >= 0.15
-               , hosc-json >= 0.15
-               , http-types == 0.8.*
+               , http-types == 0.9.*
                , io-streams
                , lens == 4.*
                , regex-posix ==0.95.*
