@@ -59,8 +59,36 @@ defaultChoiceVis = ChoiceVis { _choiceVisualization = "Blank"
 
 defaultVisualizations :: [Visualization]
 defaultVisualizations = [ Visualization { _visName="Blank", _visControls=[]}
+                        , Visualization { _visName="Simple"
+                                        , _visControls=[ ControlSlider $ Slider "Volume" 1 0 2
+                                                       , ControlSlider $ Slider "Hole Size"  0.2 0 1
+                                                       ]}
+                        , Visualization { _visName="Circular"
+                                        , _visControls=[ ControlSlider $ Slider "Volume" 1 0 2]}
+                        , Visualization { _visName="Dots"
+                                        , _visControls=[ ControlSlider $ Slider "Volume" 1 0 2]}
                         , Visualization { _visName="Buffer"
-                                        , _visControls=[ ControlSlider $  Slider "Volume" 1 0 2]}
+                                        , _visControls=[ ControlSlider $ Slider "Volume" 1 0 2]}
+                        , Visualization { _visName="Rotate"
+                                        , _visControls=[ ControlSlider $ Slider "Volume" 1 0 2]}
+                        , Visualization { _visName="Lights", _visControls=[]}
+                        , Visualization { _visName="EQPointCloud"
+                                        , _visControls=[ ControlSlider $ Slider "Volume" 0.25 0 2
+                                                       , ControlSlider $ Slider "Rotation Speed" 1 0 2]}
+                        , Visualization { _visName="Neurons"
+                                        , _visControls=[ ControlSlider $ Slider "Volume" 1 0 2]}
+                        , Visualization { _visName="Smoke"
+                                        , _visControls=[ ControlSlider $ Slider "Volume" 1 0 2
+                                                       , ControlSlider $ Slider "Speed" 2 0.5 4]}
+                        , Visualization { _visName="Flocking"
+                                        , _visControls=[ ControlSlider $ Slider "Volume" 1 0 2
+                                                       , ControlSlider $ Slider "Beat Constant" 1.4 1.1 2
+                                                       , ControlSlider $ Slider "Speed" 1.4 1.1 2
+                                                       , ControlSlider $ Slider "Roaming Distance" 40 20 120
+                                                       , ControlSlider $ Slider "Separation Distance" 12 0 30
+                                                       , ControlSlider $ Slider "Cohesion Distance" 12 0 30
+                                                       , ControlSlider $ Slider "Alignment Distance" 12 0 30
+                                                       ]}
                         ]
 
 newCinderState :: Mixer
@@ -99,7 +127,7 @@ valueAddress = "/value" :: String
 
 -- OSC Flags
 
-controlFlag = OSC.d_put (32 :: Int)
+controlFlag = OSC.d_put (32 :: Int32)
 toggleFlag = OSC.d_put $ BSC.pack "b"
 sliderFlag = OSC.d_put $ BSC.pack "f"
 

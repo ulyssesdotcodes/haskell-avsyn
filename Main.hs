@@ -84,6 +84,8 @@ sendUDPMessage  message = do
 
 sendUDPMessages :: [ OSC.Message ] -> IO ()
 sendUDPMessages messages = do
+  print messages
+  hFlush stdout
   OSC.withTransport (OSC.openUDP "127.0.0.1" 3334) $ OSC.sendBundle (OSC.Bundle 0.0 messages)
 
 receiveMessageTransport :: IO OSC.UDP -> MessageQueue -> IO ()
