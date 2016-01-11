@@ -61,6 +61,10 @@ messagesFromMaybe (Just x) = x
 modifyMixer :: MVar Mixer -> ServerState -> OSC.Message -> IO ()
 modifyMixer mixerState serverState message = do
     messages <- modifyMVar mixerState (return . applyMessage message)
+    sendMessages serverState messages
+
+sendMessages :: ServerState -> [OSC.Message] -> IO ()
+sendMessages serverState messages = do
     sendUDPMessages messages
     broadcastMessages messages serverState
 
@@ -78,15 +82,23 @@ messagesToBundle :: [OSC.Message] -> OSC.Bundle
 messagesToBundle = OSC.bundle OSC.immediately
 
 -- OSC messaging
+
+udpAddresses :: [String]
+udpAddresses = ["64.255.16.173", "127.0.0.1"]
+
 sendUDPMessage :: OSC.Message -> IO ()
 sendUDPMessage  message = do
-  OSC.withTransport (OSC.openUDP "127.0.0.1" 3334) $ OSC.sendMessage message
+  OSC.withTransport (OSC.openUDP "64.255.16.255" 3334) $ OSC.sendMessage message
 
 sendUDPMessages :: [ OSC.Message ] -> IO ()
 sendUDPMessages messages = do
   print messages
   hFlush stdout
-  OSC.withTransport (OSC.openUDP "127.0.0.1" 3334) $ OSC.sendBundle (OSC.Bundle 0.0 messages)
+  mapM_ (sendUDPBundleToAddress messages) udpAddresses
+
+sendUDPBundleToAddress :: [OSC.Message] -> String -> IO ()
+sendUDPBundleToAddress messages address =
+  OSC.withTransport (OSC.openUDP address 3334) (OSC.sendBundle $ OSC.Bundle 0.0 messages)
 
 receiveMessageTransport :: IO OSC.UDP -> MessageQueue -> IO ()
 receiveMessageTransport t mChan = OSC.withTransport t $ forever $ do
@@ -96,18 +108,21 @@ receiveMessageTransport t mChan = OSC.withTransport t $ forever $ do
 receiveMessages :: MessageQueue -> IO ()
 receiveMessages = receiveMessageTransport $ OSC.udpServer "0.0.0.0" 3333
 
-handleUDPMessages:: MessageQueue -> MVar Mixer -> IO ()
-handleUDPMessages mChan mixer = do
+handleUDPMessages:: MessageQueue -> MVar ServerState -> MVar Mixer -> IO ()
+handleUDPMessages mChan serverState mixer = do
   msg <- readChan mChan
+  clients <- readMVar serverState
   handleUDPMessage msg
-  handleUDPMessages mChan mixer
+  print msg
+  hFlush stdout
+  modifyMixer mixer clients msg
+  handleUDPMessages mChan serverState mixer
   where
     handleUDPMessage (OSC.Message a __)
       | "/connection" `T.isPrefixOf` T.pack a = do
         mixerState <- readMVar mixer
         sendUDPMessages $ mixerToMessages False mixerState
       | otherwise = return ()
-
 
 -- Serve webpage and init sockets
 server :: MessageQueue -> IO()
@@ -116,7 +131,7 @@ server mq = do
   putStrLn $ "Listening on port " ++ show port
   serverState <- newMVar newServerState
   cinderState <- newMVar newCinderState
-  __ <- forkIO $ handleUDPMessages mq cinderState
+  __ <- forkIO $ handleUDPMessages mq serverState cinderState
   sendUDPMessage $ OSC.message "/connection" []
   Warp.run
     port

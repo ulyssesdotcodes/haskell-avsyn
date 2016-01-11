@@ -124,6 +124,7 @@ effectsAddress = "/effects" :: String
 slidersAddress = "/sliders" :: String
 choiceAddress = "/choice" :: String
 valueAddress = "/value" :: String
+beatAddress = "/beat" :: String
 
 -- OSC Flags
 
@@ -138,7 +139,7 @@ sliderFlag = OSC.d_put $ BSC.pack "f"
 applyMessage :: OSC.Message -> Mixer -> (Mixer, [OSC.Message])
 applyMessage (OSC.Message address datum) mixer
   | (mixAddress ++ controlsAddress) `isPrefixOf` address =
-    createResult (mixControls) modifiedMixControls
+    createResult mixControls modifiedMixControls
   | (visAAddress ++ effectsAddress) `isPrefixOf` address =
     createResult (mixChoiceA . choiceControls) modifiedChoiceAControl
   | (visBAddress ++ effectsAddress) `isPrefixOf` address =
@@ -149,6 +150,9 @@ applyMessage (OSC.Message address datum) mixer
     createResult mixChoiceB (modifiedChoice visBAddress (mixer ^. mixChoiceB))
   | (visAAddress ++ slidersAddress) `isPrefixOf` address =
     createResult (mixChoiceA . choiceSliders) modifiedChoiceASlider
+  | (visBAddress ++ slidersAddress) `isPrefixOf` address =
+    createResult (mixChoiceB . choiceSliders) modifiedChoiceBSlider
+  | beatAddress `isPrefixOf` address = (mixer, [OSC.Message address datum])
   | otherwise = (mixer, [])
   where
     extractControlName = take (last separatorIndices - last (init separatorIndices) - 1) $ drop ((+1) . last . init $ separatorIndices) address
@@ -162,6 +166,8 @@ applyMessage (OSC.Message address datum) mixer
       modifiedControls (visBAddress ++ effectsAddress) (mixChoiceB . choiceControls)
     modifiedChoiceASlider =
       modifiedControls (visAAddress ++ slidersAddress) (mixChoiceA . choiceSliders)
+    modifiedChoiceBSlider =
+      modifiedControls (visBAddress ++ slidersAddress) (mixChoiceB . choiceSliders)
     createResult getter modifier = (set getter (fst modifier) mixer, snd modifier)
     modifiedChoice path choice = switchChoice path firstValueAsString choice (mixer ^. mixVisualizations)
     firstValueAsString = BSC.unpack $ firstValue datum
@@ -182,7 +188,7 @@ switchChoice path choiceName choice visualizations =
     visControls_ = vis ^. visControls
 
 controlsMessages :: String -> [Control] -> [OSC.Message]
-controlsMessages path controls = concat $ map controlToMessages controls
+controlsMessages path = concatMap controlToMessages
   where
     controlToMessages control = [messageFromControl control True, messageFromControl control False]
     messageFromControl control isClient = let datum = controlToDatum control isClient
@@ -211,11 +217,11 @@ mixerToMessages isClient mixer =
   (createMessages mixControls (mixAddress ++ controlsAddress)) ++
   (createMessages (mixChoiceA . choiceControls) (visAAddress ++ effectsAddress)) ++
   (createMessages (mixChoiceB . choiceControls) (visBAddress ++ effectsAddress)) ++
-  ([createChoiceVisChoiceMessage (visAAddress ++ choiceAddress) mixChoiceA]) ++
-  ([createChoiceVisChoiceMessage (visBAddress ++ choiceAddress) mixChoiceB]) ++
+  [createChoiceVisChoiceMessage (visAAddress ++ choiceAddress) mixChoiceA] ++
+  [createChoiceVisChoiceMessage (visBAddress ++ choiceAddress) mixChoiceB] ++
   (createMessages (mixChoiceA . choiceSliders) (visAAddress ++ slidersAddress)) ++
   (createMessages (mixChoiceB . choiceSliders) (visBAddress ++ slidersAddress)) ++
-  ([createChoicesMessage])
+  [createChoicesMessage]
   where
     createMessages getter path = map (createMessage path) $ view getter mixer
     createMessage path (ControlSlider control) =
@@ -228,7 +234,7 @@ mixerToMessages isClient mixer =
         OSC.Message address $ [OSC.d_put $ BSC.pack (mixer ^. getter . choiceVisualization)]
 
 createControlListMessages :: String -> Bool -> [Control] -> [OSC.Message]
-createControlListMessages address isClient controls = map createControlMessage controls
+createControlListMessages address isClient = map createControlMessage
   where
     createControlMessage (ControlSlider control) = OSC.Message address (controlSliderToDatum isClient control)
     createControlMessage (ControlToggle control) = OSC.Message address (controlToggleToDatum isClient control)
@@ -250,22 +256,22 @@ toggleHasName controlName toggle = (controlName == toggle ^. _ControlToggle . co
 
 controlSliderToDatum :: Bool -> Slider -> [OSC.Datum]
 controlSliderToDatum isClient control
-  | isClient == True = [ controlFlag
-                       , sliderFlag
-                       , OSC.d_put $ BSC.pack $ view controlSliderName control
-                       , toDatum controlSliderValue
-                       , toDatum controlSliderMin
-                       , toDatum controlSliderMax
-                       ]
+   | isClient = [ controlFlag
+                , sliderFlag
+                , OSC.d_put $ BSC.pack $ view controlSliderName control
+                , toDatum controlSliderValue
+                , toDatum controlSliderMin
+                , toDatum controlSliderMax
+                ]
   | otherwise = [toDatum controlSliderValue]
   where
     toDatum f = OSC.d_put $ view f control
 
 controlToggleToDatum :: Bool -> Toggle -> [OSC.Datum]
 controlToggleToDatum isClient control
-  | isClient == True = [ controlFlag
-                       , toggleFlag
-                       , OSC.d_put $ BSC.pack $ view controlToggleName control
-                       , OSC.d_put $ view controlToggleValue control
-                       ]
+  | isClient = [ controlFlag
+               , toggleFlag
+               , OSC.d_put $ BSC.pack $ view controlToggleName control
+               , OSC.d_put $ view controlToggleValue control
+               ]
   | otherwise  = [OSC.d_put $ view controlToggleValue control]
