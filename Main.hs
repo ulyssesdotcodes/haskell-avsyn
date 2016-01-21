@@ -23,6 +23,7 @@ import qualified Network.Wai.Application.Static as Static
 import qualified Sound.OSC as OSC
 import AesonOSC
 import Cinder
+import Rpi
 
 type MessageQueue = Chan OSC.Message
 
@@ -60,7 +61,12 @@ messagesFromMaybe (Just x) = x
 
 modifyMixer :: MVar Mixer -> ServerState -> OSC.Message -> IO ()
 modifyMixer mixerState serverState message = do
-    messages <- modifyMVar mixerState (return . applyMessage message)
+    messages <- modifyMVar mixerState (return . applyCinderMessage message)
+    sendMessages serverState messages
+
+modifyRpi :: Mvar Program -> ServerState -> OSC.Message -> IO ()
+modifyRpi mixerState serverState message = do
+    messages <- modifyMVar rpiState (return . applyRpiMessage message)
     sendMessages serverState messages
 
 sendMessages :: ServerState -> [OSC.Message] -> IO ()
@@ -68,12 +74,13 @@ sendMessages serverState messages = do
     sendUDPMessages messages
     broadcastMessages messages serverState
 
-receiveSocketMessages :: MVar Mixer -> WS.Connection -> MVar ServerState -> IO ()
-receiveSocketMessages state conn serverState = forever $ do
+receiveSocketMessages :: MVar Mixer -> MVar Program -> WS.Connection -> MVar ServerState -> IO ()
+receiveSocketMessages cinderState rpiState conn serverState = forever $ do
   (msg :: ByteString) <- WS.receiveData conn
   clients <- readMVar serverState
   let messages = extractMessages msg
-  mapM_ (modifyMixer state clients) messages
+  -- mapM_ (modifyMixer cinderState clients) messages
+  mapM_ (modifyRpi rpiState clients) messages
 
 bundleToMessages :: OSC.Bundle -> [OSC.Message]
 bundleToMessages = OSC.bundleMessages
@@ -108,15 +115,16 @@ receiveMessageTransport t mChan = OSC.withTransport t $ forever $ do
 receiveMessages :: MessageQueue -> IO ()
 receiveMessages = receiveMessageTransport $ OSC.udpServer "0.0.0.0" 3333
 
-handleUDPMessages:: MessageQueue -> MVar ServerState -> MVar Mixer -> IO ()
-handleUDPMessages mChan serverState mixer = do
+handleUDPMessages:: MessageQueue -> MVar ServerState -> MVar Mixer -> MVar Program -> IO ()
+handleUDPMessages mChan serverState mixer program = do
   msg <- readChan mChan
   clients <- readMVar serverState
   handleUDPMessage msg
   print msg
   hFlush stdout
   modifyMixer mixer clients msg
-  handleUDPMessages mChan serverState mixer
+  modifyRpi program clients msg
+  handleUDPMessages mChan serverState mixer program
   where
     handleUDPMessage (OSC.Message a __)
       | "/connection" `T.isPrefixOf` T.pack a = do

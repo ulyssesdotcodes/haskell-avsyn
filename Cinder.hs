@@ -2,7 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module Cinder (Mixer, newCinderState, applyMessage, mixerToMessages) where
+module Cinder (Mixer, newCinderState, applyCinderMessage, mixerToMessages) where
 
 import Control.Lens
 import Data.Data
@@ -136,8 +136,8 @@ sliderFlag = OSC.d_put $ BSC.pack "f"
 
 -- applying choice message -> [{"/visA/sliders/clear" []}, {"/visA/sliders/Fade", ["Fade", 0, 0, 2]}]
 
-applyMessage :: OSC.Message -> Mixer -> (Mixer, [OSC.Message])
-applyMessage (OSC.Message address datum) mixer
+applyCinderMessage :: OSC.Message -> Mixer -> (Mixer, [OSC.Message])
+applyCinderMessage (OSC.Message address datum) mixer
   | (mixAddress ++ controlsAddress) `isPrefixOf` address =
     createResult mixControls modifiedMixControls
   | (visAAddress ++ effectsAddress) `isPrefixOf` address =
