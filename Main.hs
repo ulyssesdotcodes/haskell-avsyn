@@ -64,8 +64,8 @@ modifyMixer mixerState serverState message = do
     messages <- modifyMVar mixerState (return . applyCinderMessage message)
     sendMessages serverState messages
 
-modifyRpi :: Mvar Program -> ServerState -> OSC.Message -> IO ()
-modifyRpi mixerState serverState message = do
+modifyRpi :: MVar Program -> ServerState -> OSC.Message -> IO ()
+modifyRpi rpiState serverState message = do
     messages <- modifyMVar rpiState (return . applyRpiMessage message)
     sendMessages serverState messages
 
@@ -126,11 +126,11 @@ handleUDPMessages mChan serverState mixer program = do
   modifyRpi program clients msg
   handleUDPMessages mChan serverState mixer program
   where
-    handleUDPMessage (OSC.Message a __)
-      | "/connection" `T.isPrefixOf` T.pack a = do
-        mixerState <- readMVar mixer
-        sendUDPMessages $ mixerToMessages False mixerState
-      | otherwise = return ()
+    handleUDPMessage (OSC.Message a __) = return ()
+      -- | "/connection" `T.isPrefixOf` T.pack a = do
+      -- mixerState <- readMVar mixer
+        -- sendUDPMessages $ mixerToMessages False mixerState
+      -- | otherwise = return ()
 
 -- Serve webpage and init sockets
 server :: MessageQueue -> IO()
@@ -139,17 +139,18 @@ server mq = do
   putStrLn $ "Listening on port " ++ show port
   serverState <- newMVar newServerState
   cinderState <- newMVar newCinderState
-  __ <- forkIO $ handleUDPMessages mq serverState cinderState
+  rpiState <- newMVar defaultProgram
+  __ <- forkIO $ handleUDPMessages mq serverState cinderState rpiState
   sendUDPMessage $ OSC.message "/connection" []
   Warp.run
     port
-    $ WaiWS.websocketsOr WS.defaultConnectionOptions (application cinderState serverState) staticApp
+    $ WaiWS.websocketsOr WS.defaultConnectionOptions (application cinderState rpiState serverState) staticApp
 
 staticApp :: Network.Wai.Application
 staticApp = Static.staticApp $ Static.defaultWebAppSettings "C:\\Users\\Ulysses\\Development\\avsyn-web-interface\\public"
 
-application :: MVar Mixer -> MVar ServerState -> WS.ServerApp
-application cinderState serverState pending = do
+application :: MVar Mixer -> MVar Program -> MVar ServerState -> WS.ServerApp
+application cinderState rpiState serverState pending = do
   conn <- WS.acceptRequest pending
   WS.forkPingThread conn 30
   connId <- newUnique
@@ -161,8 +162,9 @@ application cinderState serverState pending = do
         hFlush stdout
         return s'
     mixer <- readMVar cinderState
-    (WS.sendTextData conn) . bundleToJSON . messagesToBundle $ mixerToMessages True mixer
-    receiveSocketMessages cinderState conn serverState
+    program <- readMVar rpiState
+    -- (WS.sendTextData conn) . bundleToJSON . messagesToBundle $ mixerToMessages True mixer
+    receiveSocketMessages cinderState rpiState conn serverState
     where
         disconnect client = do
             s <- modifyMVar_ serverState $ \s ->

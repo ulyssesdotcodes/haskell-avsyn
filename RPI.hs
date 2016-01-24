@@ -1,7 +1,7 @@
-k{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module Rpi (Program, applyRpiMessage, defaultRpi) where
+module Rpi (Program, applyRpiMessage, defaultProgram) where
 
 import Control.Lens
 import Data.Int
@@ -9,45 +9,52 @@ import Data.List
 import Data.Maybe
 import qualified Sound.OSC as OSC
 
-data Program = DimmedLight { _dimmedLightLevel :: Float }
+data Program = Program { _lightLevel:: Float
+                       , _program :: String
+                       }
 
-defaultDimmedLightProgram :: Program
-defaultDimmedLightProgram = DimmedLight { _dimmedLightLevel = 0 }
+defaultProgram :: Program
+defaultProgram = Program { _lightLevel = 0
+                         , _program = "lit"
+                         }
 
-type ProgramName = String
-data Message = SwitchProgramMessage { _name :: ProgramName } |
-  DimmedLightMessage { _newDimmedLightLevel :: Float } |
+
+data Message = ProgramMessage { _newProgram :: String } |
+  LightLevelMessage { _newLightLevel :: Float } |
   EmptyMessage
 
-data ParsedMessage = Message | Empty
-
-switchProgramAddress = "/rpi/program"
-dimLightAddress = "/rpi/dimLight"
-
-defaultRpi = defaultDimmedLightProgram
+programAddress = "/rpi/program"
+lightLevelAddress = "/rpi/lightLevel"
 
 -- Lenses
 
-makePrisms ''Program
+makeLenses ''Program
+makePrisms ''Message
 
 applyRpiMessage :: OSC.Message -> Program -> (Program, [OSC.Message])
 applyRpiMessage (OSC.Message a datum) program = let message = parseMessage a datum
-                                  in case message of
-                                     EmptyMessage -> (program, [])
-                                     Message m -> (m & setter message .~ fst modified, createMessages m)
+                                  in (setter message program, createMessages message)
 
-parseMessage :: String -> [OSC.Datum] -> ParsedMessage
+parseMessage :: String -> [OSC.Datum] -> Message
 parseMessage address datum
-  | switchProgramAddress `isPrefixOf` address = SwitchProgramMessage { _name = drop (length switchProgramAddress) address }
-  | dimLightAddress `isPrefixOf` address = DimmedLightMessage { _newDimmedLightLevel = firstValue datum }
+  | programAddress `isPrefixOf` address = ProgramMessage { _newProgram = drop (length programAddress) address }
+  | lightLevelAddress `isPrefixOf` address = LightLevelMessage { _newLightLevel = firstValue datum }
   | otherwise = EmptyMessage
 
-setter :: OSC.Message -> Program -> Program
-setter DimmedLight { _dimmedLightLevel=level } p = set p 
+setter :: Message -> Program -> Program
+setter ProgramMessage { _newProgram=program_ } = set program program_
+setter LightLevelMessage { _newLightLevel=lightLevel_ } = set lightLevel lightLevel_
+setter EmptyMessage = programId
+
+programId :: Program -> Program
+programId program = program
 
 createMessages :: Message -> [OSC.Message]
-createMessages DimmedLight { _dimmedLightLevel=level } =
-  [OSC.Message "/rpi/program" [OSC.d_put (1 :: Int32)], OSC.Message "/rpi/dimLight" [OSC.d_put level]]
+createMessages ProgramMessage { _newProgram=program_ } =
+  [OSC.Message "/rpi/program" [OSC.d_put (OSC.ascii program_)]]
+createMessages LightLevelMessage { _newLightLevel=lightLevel_ } =
+  [OSC.Message "/rpi/lightLevel" [OSC.d_put lightLevel_]]
+createMessages EmptyMessage = []
 
 -- Utils
 
