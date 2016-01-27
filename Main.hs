@@ -91,7 +91,7 @@ messagesToBundle = OSC.bundle OSC.immediately
 -- OSC messaging
 
 udpAddresses :: [String]
-udpAddresses = ["64.255.16.173", "127.0.0.1"]
+udpAddresses = ["64.255.16.177", "127.0.0.1"]
 
 sendUDPMessage :: OSC.Message -> IO ()
 sendUDPMessage  message = do
@@ -140,14 +140,14 @@ server mq = do
   serverState <- newMVar newServerState
   cinderState <- newMVar newCinderState
   rpiState <- newMVar defaultProgram
-  __ <- forkIO $ handleUDPMessages mq serverState cinderState rpiState
-  sendUDPMessage $ OSC.message "/connection" []
+  forkIO $ handleUDPMessages mq serverState cinderState rpiState
+  -- sendUDPMessage $ OSC.message "/connection" []
   Warp.run
     port
     $ WaiWS.websocketsOr WS.defaultConnectionOptions (application cinderState rpiState serverState) staticApp
 
 staticApp :: Network.Wai.Application
-staticApp = Static.staticApp $ Static.defaultWebAppSettings "C:\\Users\\Ulysses\\Development\\avsyn-web-interface\\public"
+staticApp = Static.staticApp $ Static.defaultWebAppSettings "../avsyn-web-interface/public"
 
 application :: MVar Mixer -> MVar Program -> MVar ServerState -> WS.ServerApp
 application cinderState rpiState serverState pending = do

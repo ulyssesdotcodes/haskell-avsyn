@@ -7,6 +7,7 @@ import Control.Lens
 import Data.Int
 import Data.List
 import Data.Maybe
+import Data.Text.Lens
 import qualified Sound.OSC as OSC
 
 data Program = Program { _lightLevel:: Float
@@ -37,7 +38,8 @@ applyRpiMessage (OSC.Message a datum) program = let message = parseMessage a dat
 
 parseMessage :: String -> [OSC.Datum] -> Message
 parseMessage address datum
-  | programAddress `isPrefixOf` address = ProgramMessage { _newProgram = drop (length programAddress) address }
+  | programAddress `isPrefixOf` address =
+    ProgramMessage { _newProgram = OSC.ascii_to_string $ firstValue datum }
   | lightLevelAddress `isPrefixOf` address = LightLevelMessage { _newLightLevel = firstValue datum }
   | otherwise = EmptyMessage
 
