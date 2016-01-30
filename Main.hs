@@ -91,7 +91,7 @@ messagesToBundle = OSC.bundle OSC.immediately
 -- OSC messaging
 
 udpAddresses :: [String]
-udpAddresses = ["64.255.16.177", "127.0.0.1"]
+udpAddresses = ["192.168.0.100", "127.0.0.1"]
 
 sendUDPMessage :: OSC.Message -> IO ()
 sendUDPMessage  message = do

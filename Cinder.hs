@@ -114,7 +114,7 @@ makePrisms ''Control
 
 -- Address definition
 
-mixAddress = "/mix" :: String
+mixAddress = "/cinder/mix" :: String
 visAAddress = "/visA" :: String
 visBAddress = "/visB" :: String
 choicesAddress = "/choices" :: String
