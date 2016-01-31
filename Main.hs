@@ -79,8 +79,8 @@ receiveSocketMessages cinderState rpiState conn serverState = forever $ do
   (msg :: ByteString) <- WS.receiveData conn
   clients <- readMVar serverState
   let messages = extractMessages msg
-  -- mapM_ (modifyMixer cinderState clients) messages
   mapM_ (modifyRpi rpiState clients) messages
+  mapM_ (modifyMixer cinderState clients) messages
 
 bundleToMessages :: OSC.Bundle -> [OSC.Message]
 bundleToMessages = OSC.bundleMessages
@@ -91,7 +91,7 @@ messagesToBundle = OSC.bundle OSC.immediately
 -- OSC messaging
 
 udpAddresses :: [String]
-udpAddresses = ["192.168.0.100", "127.0.0.1"]
+udpAddresses = ["127.0.0.1"]
 
 sendUDPMessage :: OSC.Message -> IO ()
 sendUDPMessage  message = do
@@ -126,11 +126,11 @@ handleUDPMessages mChan serverState mixer program = do
   modifyRpi program clients msg
   handleUDPMessages mChan serverState mixer program
   where
-    handleUDPMessage (OSC.Message a __) = return ()
-      -- | "/connection" `T.isPrefixOf` T.pack a = do
-      -- mixerState <- readMVar mixer
-        -- sendUDPMessages $ mixerToMessages False mixerState
-      -- | otherwise = return ()
+    handleUDPMessage (OSC.Message a __)
+      | "/connection" `T.isPrefixOf` T.pack a = do
+        mixerState <- readMVar mixer
+        sendUDPMessages $ mixerToMessages False mixerState
+      | otherwise = return ()
 
 -- Serve webpage and init sockets
 server :: MessageQueue -> IO()
@@ -141,13 +141,13 @@ server mq = do
   cinderState <- newMVar newCinderState
   rpiState <- newMVar defaultProgram
   forkIO $ handleUDPMessages mq serverState cinderState rpiState
-  -- sendUDPMessage $ OSC.message "/connection" []
+  sendUDPMessage $ OSC.message "/connection" []
   Warp.run
     port
     $ WaiWS.websocketsOr WS.defaultConnectionOptions (application cinderState rpiState serverState) staticApp
 
 staticApp :: Network.Wai.Application
-staticApp = Static.staticApp $ Static.defaultWebAppSettings "../avsyn-web-interface/public"
+staticApp = Static.staticApp $ Static.defaultWebAppSettings "C:\\Users\\Ulysses\\Development\\avsyn-web-interface\\public"
 
 application :: MVar Mixer -> MVar Program -> MVar ServerState -> WS.ServerApp
 application cinderState rpiState serverState pending = do
@@ -163,7 +163,7 @@ application cinderState rpiState serverState pending = do
         return s'
     mixer <- readMVar cinderState
     program <- readMVar rpiState
-    -- (WS.sendTextData conn) . bundleToJSON . messagesToBundle $ mixerToMessages True mixer
+    (WS.sendTextData conn) . bundleToJSON . messagesToBundle $ mixerToMessages True mixer
     receiveSocketMessages cinderState rpiState conn serverState
     where
         disconnect client = do
