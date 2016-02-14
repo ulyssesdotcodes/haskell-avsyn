@@ -89,6 +89,8 @@ defaultVisualizations = [ Visualization { _visName="Blank", _visControls=[]}
                                                        , ControlSlider $ Slider "Cohesion Distance" 12 0 30
                                                        , ControlSlider $ Slider "Alignment Distance" 12 0 30
                                                        ]}
+                        , Visualization { _visName="Video"
+                                        , _visControls=[]}
                         ]
 
 newCinderState :: Mixer
