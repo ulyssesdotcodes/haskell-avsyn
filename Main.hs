@@ -22,7 +22,7 @@ import qualified Network.Wai.Handler.WebSockets as WaiWS
 import qualified Network.Wai.Application.Static as Static
 import qualified Sound.OSC as OSC
 import AesonOSC
-import RPI
+import Rpi
 import Cinder
 import HoY
 
@@ -80,8 +80,8 @@ sendMessages serverState messages = do
     sendUDPMessages messages
     broadcastMessages messages serverState
 
-receiveSocketMessages :: MVar Mixer -> MVar Program -> WS.Connection -> MVar ServerState -> IO ()
-receiveSocketMessages cinderState rpiState conn serverState = forever $ do
+receiveSocketMessages :: MVar HoYProg -> WS.Connection -> MVar ServerState -> IO ()
+receiveSocketMessages hoyState conn serverState = forever $ do
   (msg :: ByteString) <- WS.receiveData conn
   clients <- readMVar serverState
   let messages = extractMessages msg
@@ -122,20 +122,21 @@ receiveMessages :: MessageQueue -> IO ()
 receiveMessages = receiveMessageTransport $ OSC.udpServer "0.0.0.0" 3333
 
 handleUDPMessages:: MessageQueue -> MVar ServerState -> MVar HoYProg -> IO ()
-handleUDPMessages mChan serverState mixer program = do
+handleUDPMessages mChan serverState hoyProg = do
   msg <- readChan mChan
   clients <- readMVar serverState
   handleUDPMessage msg
   print msg
   hFlush stdout
-  modifyMixer mixer clients msg
-  modifyRpi program clients msg
-  handleUDPMessages mChan serverState mixer program
+  -- modifyMixer mixer clients msg
+  -- modifyRpi program clients msg
+  modifyHoY hoyProg clients msg
+  handleUDPMessages mChan serverState hoyProg
   where
     handleUDPMessage (OSC.Message a __)
-      | "/connection" `T.isPrefixOf` T.pack a = do
-        mixerState <- readMVar mixer
-        sendUDPMessages $ mixerToMessages False mixerState
+      -- | "/connection" `T.isPrefixOf` T.pack a = do
+      --   mixerState <- readMVar hoyProg
+      --   sendUDPMessages $ mixerToMessages False mixerState
       | otherwise = return ()
 
 -- Serve webpage and init sockets
@@ -144,17 +145,18 @@ server mq = do
   let port = 3000
   putStrLn $ "Listening on port " ++ show port
   serverState <- newMVar newServerState
+  hoyState <- newMVar defaultHoYProg
 
-  forkIO $ handleUDPMessages mq serverState cinderState rpiState
+  forkIO $ handleUDPMessages mq serverState hoyState
   sendUDPMessage $ OSC.message "/connection" []
   Warp.run
     port
-    $ WaiWS.websocketsOr WS.defaultConnectionOptions (application cinderState rpiState serverState) staticApp
+    $ WaiWS.websocketsOr WS.defaultConnectionOptions (application hoyState serverState) staticApp
 
 staticApp :: Network.Wai.Application
 staticApp = Static.staticApp $ Static.defaultWebAppSettings "C:\\Users\\Ulysses\\Development\\avsyn-web-interface\\public"
 
-application :: MVar HoYProg -> MVar ServerState -> MWS.ServerApp
+application :: MVar HoYProg -> MVar ServerState -> WS.ServerApp
 application hoyState serverState pending = do
   conn <- WS.acceptRequest pending
   WS.forkPingThread conn 30

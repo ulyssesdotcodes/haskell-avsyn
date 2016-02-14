@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module HoY (HoYProg, applyHoYMessage, defaultProgram) where
+module HoY (HoYProg, applyHoYMessage, defaultHoYProg) where
 
 import Control.Lens
 import Data.Int
