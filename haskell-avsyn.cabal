@@ -17,7 +17,7 @@ cabal-version:       >=1.10
 
 executable haskell-avsyn
   main-is:             Main.hs
-  other-modules:       AesonOSC, Cinder, Rpi
+  other-modules:       AesonOSC, Cinder, Rpi, HoY
   -- other-extensions:    
   build-depends: aeson ==0.10.*
                , base >=4.6, base-prelude
