@@ -11,10 +11,12 @@ import Data.Text.Lens
 import qualified Sound.OSC as OSC
 
 data HoYProg = HoYProg { _program :: String
+                       , _programs :: [String]
                        }
 
 defaultHoYProg :: HoYProg
-defaultHoYProg = HoYProg { _program = "blank"
+defaultHoYProg = HoYProg { _program = "Blank",
+                           _programs = ["Blank", "Nightlife"]
                          }
 
 
@@ -27,6 +29,9 @@ programAddress = "/hoy/program"
 
 makeLenses ''HoYProg
 makePrisms ''Message
+
+hoyProgToMessages :: HoYProg -> [OSC.Message]
+hoyProgToMessages hoyProg = [OSC.Message "/hoy/programs" (map (OSC.d_put . OSC.ascii) (hoyProg ^. programs))]
 
 applyHoYMessage :: OSC.Message -> HoYProg -> (HoYProg, [OSC.Message])
 applyHoYMessage (OSC.Message a datum) program = let message = parseMessage a datum
