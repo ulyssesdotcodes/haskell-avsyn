@@ -77,6 +77,8 @@ modifyHoY hoyState serverState message = do
 
 sendMessages :: ServerState -> [OSC.Message] -> IO ()
 sendMessages serverState messages = do
+    print messages
+    hFlush stdout
     sendUDPMessages messages
     broadcastMessages messages serverState
 
@@ -170,8 +172,12 @@ application hoyState serverState pending = do
         return s'
     hoy <- readMVar hoyState
     -- (WS.sendTextData conn) . bundleToJSON . messagesToBundle $ mixerToMessages True mixer
+    (WS.sendTextData conn) . (bundleToJSON . messagesToBundle) $ startMessages hoy
+    print $ startMessages hoy
+    hFlush stdout
     receiveSocketMessages hoyState conn serverState
     where
+        startMessages hoy =  hoyProgToMessages hoy
         disconnect client = do
             s <- modifyMVar_ serverState $ \s ->
                 let s' = removeClient client s in return s'
