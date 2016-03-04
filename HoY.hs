@@ -23,7 +23,7 @@ data ProgSettings = ProgSettings { _progName :: String
 
 defaultHoYProg :: HoYProg
 defaultHoYProg = HoYProg { _program = "Blank"
-                         , _programs = ["Blank", "Nightlife"]
+                         , _programs = ["Blank", "Nightlife", "Fire", "Smoke", "BlueLight"]
                          , _cues = [ ProgSettings { _progName = "Nightlife"
                                                   , _progPath = "nightlife"
                                                   , _progControls =
@@ -31,6 +31,24 @@ defaultHoYProg = HoYProg { _program = "Blank"
                                                     , Control "y" (ControlSlider $ Slider (-1.3) (-2) 1)
                                                     ]
                                                   }
+                                   , ProgSettings { _progName = "Smoke"
+                                                  , _progPath = "smoke"
+                                                  , _progControls =
+                                                    [ Control "darkness" (ControlSlider $ Slider 0 0 1)
+                                                    ]}
+                                   , ProgSettings { _progName = "Fire"
+                                                   , _progPath = "fire"
+                                                   , _progControls =
+                                                    [ Control "intensity" (ControlSlider $ Slider 1 0.85 1.15)
+                                                    ]}
+                                   , ProgSettings { _progName = "BlueLight"
+                                                   , _progPath = "bluelight"
+                                                   , _progControls =
+                                                    [ Control "intensity" (ControlSlider $ Slider 1 0.0 2)
+                                                    , Control "size" (ControlSlider $ Slider 0.002 0 0.012)
+                                                    , Control "x" (ControlSlider $ Slider 0.5 0 1)
+                                                    , Control "y" (ControlSlider $ Slider 0.2 0 1)
+                                                    ]}
                                    ]
                          }
 
