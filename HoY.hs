@@ -27,8 +27,15 @@ defaultHoYProg = HoYProg { _program = "Blank"
                          , _cues = [ ProgSettings { _progName = "Nightlife"
                                                   , _progPath = "nightlife"
                                                   , _progControls =
-                                                    [ Control "x" (ControlSlider $ Slider 0 (-3) 3)
-                                                    , Control "y" (ControlSlider $ Slider (-1.3) (-2) 1)
+                                                    [ Control "startx" (ControlSlider $ Slider 0 (-3) 3)
+                                                    , Control "starty" (ControlSlider $ Slider (-1.3) (-2) 1)
+                                                    , Control "midx" (ControlSlider $ Slider (-1) (-3) 3)
+                                                    , Control "midy" (ControlSlider $ Slider (-1.3) (-2) 1)
+                                                    , Control "endx" (ControlSlider $ Slider (-1) (-3) 3)
+                                                    , Control "endy" (ControlSlider $ Slider (-1.3) (-2) 1)
+                                                    , Control "reset" (ControlToggle $ Toggle 0)
+                                                    , Control "animate" (ControlToggle $ Toggle 1)
+                                                    , Control "end" (ControlToggle $ Toggle 0)
                                                     ]
                                                   }
                                    , ProgSettings { _progName = "Smoke"
@@ -53,10 +60,10 @@ defaultHoYProg = HoYProg { _program = "Blank"
                          }
 
 
-data Slider = Slider {  _controlSliderValue :: Float
-                      , _controlSliderMin :: Float
-                      , _controlSliderMax :: Float
-                      } deriving (Show)
+data Slider = Slider { _controlSliderValue :: Float
+                     , _controlSliderMin :: Float
+                     , _controlSliderMax :: Float
+                     } deriving (Show)
 
 data Toggle = Toggle {  _controlToggleValue :: Float
                      } deriving (Show)
