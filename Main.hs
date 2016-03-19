@@ -82,12 +82,12 @@ sendMessages serverState messages = do
     sendUDPMessages messages
     broadcastMessages messages serverState
 
-receiveSocketMessages :: MVar HoYProg -> WS.Connection -> MVar ServerState -> IO ()
-receiveSocketMessages hoyState conn serverState = forever $ do
+receiveSocketMessages :: MVar HoYProg -> MVar Program -> WS.Connection -> MVar ServerState -> IO ()
+receiveSocketMessages hoyState rpiState conn serverState = forever $ do
   (msg :: ByteString) <- WS.receiveData conn
   clients <- readMVar serverState
   let messages = extractMessages msg
-  -- mapM_ (modifyRpi rpiState clients) messages
+  mapM_ (modifyRpi rpiState clients) messages
   -- mapM_ (modifyMixer cinderState clients) messages
   mapM_ (modifyHoY hoyState clients) messages
 
@@ -100,7 +100,7 @@ messagesToBundle = OSC.bundle OSC.immediately
 -- OSC messaging
 
 udpAddresses :: [String]
-udpAddresses = ["127.0.0.1"]
+udpAddresses = ["127.0.0.1", "192.168.0.101"]
 
 sendUDPMessage :: OSC.Message -> IO ()
 sendUDPMessage  message = OSC.withTransport (OSC.openUDP "64.255.16.255" 3334) $ OSC.sendMessage message
@@ -123,17 +123,17 @@ receiveMessageTransport t mChan = OSC.withTransport t $ forever $ do
 receiveMessages :: MessageQueue -> IO ()
 receiveMessages = receiveMessageTransport $ OSC.udpServer "0.0.0.0" 3333
 
-handleUDPMessages:: MessageQueue -> MVar ServerState -> MVar HoYProg -> IO ()
-handleUDPMessages mChan serverState hoyProg = do
+handleUDPMessages:: MessageQueue -> MVar ServerState -> MVar HoYProg -> MVar Program -> IO ()
+handleUDPMessages mChan serverState hoyProg program = do
   msg <- readChan mChan
   clients <- readMVar serverState
   handleUDPMessage msg
   print msg
   hFlush stdout
   -- modifyMixer mixer clients msg
-  -- modifyRpi program clients msg
+  modifyRpi program clients msg
   modifyHoY hoyProg clients msg
-  handleUDPMessages mChan serverState hoyProg
+  handleUDPMessages mChan serverState hoyProg program
   where
     handleUDPMessage (OSC.Message a __)
       -- | "/connection" `T.isPrefixOf` T.pack a = do
@@ -148,18 +148,19 @@ server mq = do
   putStrLn $ "Listening on port " ++ show port
   serverState <- newMVar newServerState
   hoyState <- newMVar defaultHoYProg
+  rpiState <- newMVar defaultProgram
 
-  forkIO $ handleUDPMessages mq serverState hoyState
+  forkIO $ handleUDPMessages mq serverState hoyState rpiState
   sendUDPMessage $ OSC.message "/connection" []
   Warp.run
     port
-    $ WaiWS.websocketsOr WS.defaultConnectionOptions (application hoyState serverState) staticApp
+    $ WaiWS.websocketsOr WS.defaultConnectionOptions (application hoyState rpiState serverState ) staticApp
 
 staticApp :: Network.Wai.Application
 staticApp = Static.staticApp $ Static.defaultWebAppSettings "C:\\Users\\Ulysses\\Development\\avsyn-web-interface\\public"
 
-application :: MVar HoYProg -> MVar ServerState -> WS.ServerApp
-application hoyState serverState pending = do
+application :: MVar HoYProg -> MVar Program -> MVar ServerState -> WS.ServerApp
+application hoyState rpiState serverState pending = do
   conn <- WS.acceptRequest pending
   WS.forkPingThread conn 30
   connId <- newUnique
@@ -171,13 +172,14 @@ application hoyState serverState pending = do
         hFlush stdout
         return s'
     hoy <- readMVar hoyState
+    rpi <- readMVar rpiState
     -- (WS.sendTextData conn) . bundleToJSON . messagesToBundle $ mixerToMessages True mixer
-    (WS.sendTextData conn) . (bundleToJSON . messagesToBundle) $ startMessages hoy
-    print $ startMessages hoy
+    (WS.sendTextData conn) . (bundleToJSON . messagesToBundle) $ startMessages hoy rpi
+    print $ startMessages hoy rpi
     hFlush stdout
-    receiveSocketMessages hoyState conn serverState
+    receiveSocketMessages hoyState rpiState conn serverState
     where
-        startMessages hoy =  hoyProgToMessages hoy
+        startMessages hoy rpi = hoyProgToMessages hoy
         disconnect client = do
             s <- modifyMVar_ serverState $ \s ->
                 let s' = removeClient client s in return s'
