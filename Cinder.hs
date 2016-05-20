@@ -54,6 +54,8 @@ defaultChoiceVis = ChoiceVis { _choiceVisualization = "Blank"
                                 , ControlSlider $ Slider "Hue Shift Cycle" 0 0 0.25
                                 , ControlSlider $ Slider "Saturation Shift" 0 0 1
                                 , ControlSlider $ Slider "Lightness Shift" 1 0 2
+                                , ControlSlider $ Slider "Beat Expand" 0 (-0.5) 0.5
+                                , ControlSlider $ Slider "Beat Rotate" 0 (-0.3) 0.3
                                 ]
                              , _choiceSliders = []}
 
@@ -95,8 +97,11 @@ defaultVisualizations = [ Visualization { _visName="Blank", _visControls=[]}
 
 newCinderState :: Mixer
 newCinderState = Mixer {  _mixControls=[ ControlSlider $ Slider "Fade" 0.5 0 1
-                                       , ControlSlider $ Slider "Add" 1 0 2
-                                       , ControlSlider $ Slider "Multiply" 0 0 6
+                                       , ControlSlider $ Slider "Add" 0.2 0 2
+                                       , ControlSlider $ Slider "Multiply" 6 0 6
+                                       , ControlSlider $ Slider "Beat Expand" 0 (-0.5) 0.5
+                                       , ControlSlider $ Slider "Beat Rotate" 0 (-0.25) 0.25
+                                       , ControlSlider $ Slider "Beat Light" 0 0 1
                                        ]
                        , _mixChoiceA=defaultChoiceVis
                        , _mixChoiceB=defaultChoiceVis
