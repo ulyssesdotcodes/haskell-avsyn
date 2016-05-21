@@ -129,6 +129,7 @@ handleUDPMessages mChan serverState mixer program = do
     handleUDPMessage (OSC.Message a __)
       | "/connection" `T.isPrefixOf` T.pack a = do
         mixerState <- readMVar mixer
+        print "Added connection"
         sendUDPMessages $ mixerToMessages False mixerState
       | otherwise = return ()
 

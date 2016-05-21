@@ -44,8 +44,9 @@ data Control = ControlSlider Slider | ControlToggle Toggle  deriving (Show)
 defaultChoiceVis :: ChoiceVis
 defaultChoiceVis = ChoiceVis { _choiceVisualization = "Blank"
                              , _choiceControls =
-                                [ ControlToggle $ Toggle "Apply Effects" 0
+                                [ ControlToggle $ Toggle "Apply Effects" 1
                                 , ControlToggle $ Toggle "Fade Transition" 0
+                                , ControlToggle $ Toggle "Mirror" 0
                                 , ControlSlider $ Slider "Fade" 0 0 1
                                 , ControlSlider $ Slider "Effect Fade" 0 0 1
                                 , ControlSlider $ Slider "Scale" 1 0.85 1.15
@@ -56,6 +57,7 @@ defaultChoiceVis = ChoiceVis { _choiceVisualization = "Blank"
                                 , ControlSlider $ Slider "Lightness Shift" 1 0 2
                                 , ControlSlider $ Slider "Beat Expand" 0 (-0.5) 0.5
                                 , ControlSlider $ Slider "Beat Rotate" 0 (-0.3) 0.3
+                                , ControlSlider $ Slider "Rotate" 0 (-0.3) 0.3
                                 ]
                              , _choiceSliders = []}
 
