@@ -7,14 +7,12 @@ import Control.Concurrent
 import Control.Exception (finally)
 import Control.Monad
 import Control.Monad.IO.Class (liftIO)
+import Data.List
 import Data.Maybe
-import Data.Text (Text)
 import Data.Unique
 import Data.ByteString.Lazy (ByteString)
 import qualified Data.Aeson as A
 import qualified Data.ByteString.Lazy.Char8 as BSL
-import qualified Data.Text as T
-import qualified Data.Text.IO as T
 import qualified Network.WebSockets as WS
 import qualified Network.Wai
 import qualified Network.Wai.Handler.Warp as Warp
@@ -53,7 +51,7 @@ bundleToJSON :: OSC.Bundle -> ByteString
 bundleToJSON = A.encode . A.toJSON
 
 extractMessages :: ByteString -> [OSC.Message]
-extractMessages bs =  messagesFromMaybe $ fmap bundleToMessages $ join . either (const Nothing) Just $ A.eitherDecode bs
+extractMessages bs =  messagesFromMaybe $ fmap bundleToMessages $ A.decode bs
 
 messagesFromMaybe :: Maybe [OSC.Message] -> [OSC.Message]
 messagesFromMaybe Nothing = []
@@ -113,7 +111,7 @@ receiveMessageTransport t mChan = OSC.withTransport t $ forever $ do
   liftIO $ writeChan mChan msg
 
 receiveMessages :: MessageQueue -> IO ()
-receiveMessages = receiveMessageTransport $ OSC.udpServer "0.0.0.0" 3333
+receiveMessages = receiveMessageTransport $ OSC.udpServer "127.0.0.1" 3333
 
 handleUDPMessages:: MessageQueue -> MVar ServerState -> MVar Mixer -> MVar Program -> IO ()
 handleUDPMessages mChan serverState mixer program = do
@@ -127,7 +125,7 @@ handleUDPMessages mChan serverState mixer program = do
   handleUDPMessages mChan serverState mixer program
   where
     handleUDPMessage (OSC.Message a __)
-      | "/connection" `T.isPrefixOf` T.pack a = do
+      | "/connection" `isPrefixOf` a = do
         mixerState <- readMVar mixer
         print "Added connection"
         sendUDPMessages $ mixerToMessages False mixerState

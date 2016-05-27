@@ -75,7 +75,8 @@ defaultVisualizations = [ Visualization { _visName="Blank", _visControls=[]}
                                         , _visControls=[ ControlSlider $ Slider "Volume" 1 0 2]}
                         , Visualization { _visName="Rotate"
                                         , _visControls=[ ControlSlider $ Slider "Volume" 1 0 2]}
-                        , Visualization { _visName="Lights", _visControls=[]}
+                        , Visualization { _visName="Lights"
+                                        , _visControls=[ ControlSlider $ Slider "Frequency" 1 0 4]}
                         , Visualization { _visName="EQPointCloud"
                                         , _visControls=[ ControlSlider $ Slider "Volume" 0.25 0 2
                                                        , ControlSlider $ Slider "Rotation Speed" 1 0 2]}
@@ -93,8 +94,8 @@ defaultVisualizations = [ Visualization { _visName="Blank", _visControls=[]}
                                                        , ControlSlider $ Slider "Cohesion Distance" 12 0 30
                                                        , ControlSlider $ Slider "Alignment Distance" 12 0 30
                                                        ]}
-                        , Visualization { _visName="Video"
-                                        , _visControls=[]}
+                        , Visualization { _visName="Particles"
+                                        , _visControls=[ ControlSlider $ Slider "Lifetime" 32 1 128 ]}
                         ]
 
 newCinderState :: Mixer
