@@ -95,7 +95,7 @@ defaultVisualizations = [ Visualization { _visName="Blank", _visControls=[]}
                                                        , ControlSlider $ Slider "Alignment Distance" 12 0 30
                                                        ]}
                         , Visualization { _visName="Particles"
-                                        , _visControls=[ ControlSlider $ Slider "Lifetime" 32 1 128 ]}
+                                        , _visControls=[]}
                         ]
 
 newCinderState :: Mixer
