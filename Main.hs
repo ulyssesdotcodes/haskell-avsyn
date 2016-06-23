@@ -140,13 +140,13 @@ server mq = do
   cinderState <- newMVar newCinderState
   rpiState <- newMVar defaultProgram
   forkIO $ handleUDPMessages mq serverState cinderState rpiState
-  sendUDPMessage $ OSC.message "/connection" []
+  -- sendUDPMessage $ OSC.message "/connection" []
   Warp.run
     port
     $ WaiWS.websocketsOr WS.defaultConnectionOptions (application cinderState rpiState serverState) staticApp
 
 staticApp :: Network.Wai.Application
-staticApp = Static.staticApp $ Static.defaultWebAppSettings "C:\\Users\\Ulysses\\Development\\avsyn-web-interface\\public"
+staticApp = Static.staticApp $ Static.defaultWebAppSettings "/home/ulysses/development/avsyn-web-interface"
 
 application :: MVar Mixer -> MVar Program -> MVar ServerState -> WS.ServerApp
 application cinderState rpiState serverState pending = do

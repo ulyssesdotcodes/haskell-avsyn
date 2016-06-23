@@ -1,6 +1,7 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module Cinder (Mixer, newCinderState, applyCinderMessage, mixerToMessages) where
 
@@ -22,8 +23,10 @@ data Mixer = Mixer { _mixControls :: [Control]
                    } deriving (Show)
 
 data ChoiceVis = ChoiceVis { _choiceVisualization :: String
+                           , _choiceChoiceControl :: ChoiceCon
                            , _choiceControls :: [Control]
-                           , _choiceSliders :: [Control]} deriving (Show)
+                           , _choiceSliders :: [Control]
+                           } deriving (Show)
 
 data Visualization = Visualization { _visName :: String
                                    , _visControls :: [Control]
@@ -39,10 +42,19 @@ data Toggle = Toggle { _controlToggleName :: String
                      , _controlToggleValue :: Float
                      } deriving (Show)
 
-data Control = ControlSlider Slider | ControlToggle Toggle  deriving (Show)
+data ChoiceCon = ChoiceCon { _controlChoiceName :: String
+                           , _controlChoiceValue :: String
+                           , _controlChoiceChoices :: [String]
+                           } deriving (Show)
+
+data Control = ControlSlider Slider
+  | ControlToggle Toggle
+  | ControlChoice ChoiceCon
+  deriving (Show)
 
 defaultChoiceVis :: ChoiceVis
 defaultChoiceVis = ChoiceVis { _choiceVisualization = "Blank"
+                             , _choiceChoiceControl = ChoiceCon "Vises" "Blank" $ map _visName defaultVisualizations
                              , _choiceControls =
                                 [ ControlToggle $ Toggle "Apply Effects" 1
                                 , ControlToggle $ Toggle "Fade Transition" 0
@@ -118,6 +130,7 @@ makeLenses ''Mixer
 makeLenses ''ChoiceVis
 makeLenses ''Toggle
 makeLenses ''Slider
+makeLenses ''ChoiceCon
 makeLenses ''Visualization
 makePrisms ''Control
 
@@ -132,7 +145,7 @@ controlsAddress = "/controls" :: String
 visesAddress = "/vises" :: String
 effectsAddress = "/effects" :: String
 slidersAddress = "/sliders" :: String
-choiceAddress = "/choice" :: String
+choiceAddress = "/choices" :: String
 valueAddress = "/value" :: String
 beatAddress = "/beat" :: String
 
@@ -141,6 +154,7 @@ beatAddress = "/beat" :: String
 controlFlag = OSC.d_put (32 :: Int32)
 toggleFlag = OSC.d_put $ BSC.pack "b"
 sliderFlag = OSC.d_put $ BSC.pack "f"
+choiceFlag = OSC.d_put $ BSC.pack "c"
 
 -- Applying messages
 
@@ -185,9 +199,8 @@ applyCinderMessage (OSC.Message address datum) mixer
 modifyControlList :: String -> String -> [OSC.Datum] -> [Control] -> ([Control], [OSC.Message])
 modifyControlList path controlName datum controls = (mapControls, createMessages)
   where
-    createMessages = [OSC.Message ( path ++ "/" ++ controlName ++ valueAddress) [(head datum)]]
-    firstDatumValue = firstValue datum
-    mapControls = controls & traverse %~ (mapControl controlName firstDatumValue)
+    createMessages = [OSC.Message ( path ++ "/" ++ controlName ++ valueAddress) [head datum]]
+    mapControls = controls & traverse %~ modifyControl controlName datum
 
 switchChoice :: String -> String -> ChoiceVis -> [Visualization] -> (ChoiceVis, [OSC.Message])
 switchChoice path choiceName choice visualizations =
@@ -231,38 +244,40 @@ mixerToMessages isClient mixer =
   [createChoiceVisChoiceMessage (visBAddress ++ choiceAddress) mixChoiceB] ++
   (createMessages (mixChoiceA . choiceSliders) (visAAddress ++ slidersAddress)) ++
   (createMessages (mixChoiceB . choiceSliders) (visBAddress ++ slidersAddress)) ++
-  [createChoicesMessage]
+  [createVisChoicesMessage (visAAddress ++ choiceAddress ++ "s") (mixChoiceA . choiceChoiceControl)] ++
+  [createVisChoicesMessage (visBAddress ++ choiceAddress ++ "s") (mixChoiceB . choiceChoiceControl)]
   where
     createMessages getter path = map (createMessage path) $ view getter mixer
     createMessage path (ControlSlider control) =
       OSC.Message (path ++ "/" ++ view controlSliderName control ++ valueAddressIfClient) (controlSliderToDatum isClient control)
     createMessage path (ControlToggle control) =
       OSC.Message (path ++ "/" ++ view controlToggleName control ++ valueAddressIfClient) (controlToggleToDatum isClient control)
+    createMessage path (ControlChoice control) =
+      OSC.Message (path ++ "/" ++ view controlChoiceName control ++ valueAddressIfClient) (controlChoiceToDatum isClient control)
     valueAddressIfClient = if isClient then "" else valueAddress
-    createChoicesMessage = OSC.Message choicesAddress $ map (OSC.d_put . BSC.pack . (view visName)) $ mixer ^. mixVisualizations
-    createChoiceVisChoiceMessage address getter =
-        OSC.Message address $ [OSC.d_put $ BSC.pack (mixer ^. getter . choiceVisualization)]
+    createVisChoicesMessage address getter =
+      OSC.Message address $ controlChoiceToDatum True (view getter mixer)
 
 createControlListMessages :: String -> Bool -> [Control] -> [OSC.Message]
 createControlListMessages address isClient = map createControlMessage
   where
     createControlMessage (ControlSlider control) = OSC.Message address (controlSliderToDatum isClient control)
     createControlMessage (ControlToggle control) = OSC.Message address (controlToggleToDatum isClient control)
+    createControlMessage (ControlChoice control) = OSC.Message address (controlChoiceToDatum isClient control)
 
-mapControl :: String -> Float -> Control -> Control
-mapControl controlName value control
-      | (matches _ControlSlider) && sliderHasName controlName control = mapValue $ _ControlSlider . controlSliderValue
-      | (matches _ControlToggle) && toggleHasName controlName control = mapValue $ _ControlToggle . controlToggleValue
-      | otherwise = control
-  where
-    matches f = isRight (matching f control)
-    mapValue f = control & f .~ value
+modifyControl :: String -> [OSC.Datum] -> Control -> Control
+modifyControl _ [] control = control
+modifyControl controlName (OSC.Float f:_) (ControlSlider slider) =
+  if controlName == (slider ^. controlSliderName) then ControlSlider (controlSliderValue .~ f $ slider) else ControlSlider slider
+modifyControl controlName (OSC.Float b:_) (ControlToggle toggle) =
+  if controlName == (toggle ^. controlToggleName) then ControlToggle (controlToggleValue .~ b $ toggle) else ControlToggle toggle
+modifyControl controlName (OSC.ASCII_String s:_) (ControlChoice choice) =
+  if controlName == (choice ^. controlChoiceName) then ControlChoice (controlChoiceValue .~ BSC.unpack s $ choice) else ControlChoice choice
 
-sliderHasName :: String -> Control -> Bool
-sliderHasName controlName slider = (controlName == slider ^. _ControlSlider . controlSliderName)
-
-toggleHasName :: String -> Control -> Bool
-toggleHasName controlName toggle = (controlName == toggle ^. _ControlToggle . controlToggleName)
+controlHasName :: String -> Control -> Bool
+controlHasName controlName (ControlSlider slider) = controlName == slider ^. controlSliderName
+controlHasName controlName (ControlToggle toggle) = controlName == toggle ^. controlToggleName
+controlHasName controlName (ControlChoice choice) = controlName == choice ^. controlChoiceName
 
 controlSliderToDatum :: Bool -> Slider -> [OSC.Datum]
 controlSliderToDatum isClient control
@@ -285,3 +300,11 @@ controlToggleToDatum isClient control
                , OSC.d_put $ view controlToggleValue control
                ]
   | otherwise  = [OSC.d_put $ view controlToggleValue control]
+
+controlChoiceToDatum :: Bool -> ChoiceCon -> [OSC.Datum]
+controlChoiceToDatum isClient control
+  | isClient = [ choiceFlag
+               , (OSC.d_put . BSC.pack) $ view controlChoiceName control
+               , (OSC.d_put . BSC.pack) $ view controlChoiceValue control
+               ] ++ map (OSC.d_put . BSC.pack) (view controlChoiceChoices control)
+  | otherwise  = [(OSC.d_put . BSC.pack) $ view controlChoiceValue control]
